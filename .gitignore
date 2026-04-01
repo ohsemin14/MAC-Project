@@ -1,0 +1,24 @@
+# 시뮬레이션 생성 파일
+*.vcd
+*.wlf
+*.fsdb
+transcript
+vsim.wlf
+
+# 합성 결과 파일
+*.ddc
+*.sdf
+*.v.out
+
+# 로그 및 임시 파일
+*.log
+*.bak
+*~
+
+# 라이브러리 및 IP 파일 (선택적)
+/lib/
+/ip/
+
+# 대형 테스트 벡터 파일
+*.mem
+*.dat
