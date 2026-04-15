@@ -1,7 +1,8 @@
-# 8x8 Systolic Array 기반 MAC 코어(v1.0)
+# 8x8 Systolic Array 기반 MAC 코어(v2.0)
 
 ## Project Overview
 엣지 디바이스 환경을 타겟으로 한 고성능·저면적 행렬 곱셈 하드웨어 가속기 IP 설계 프로젝트입니다.
+초기 설계의 물리적 I/O 한계를 극복하기 위한 내부 버퍼와 파이프라인 제어 로직을 추가하였습니다.
 Python 기반의 Golden Model과 SystemVerilog RTL 설계를 교차 검증실시 하였으며 완벽하게 통과하여 설계의 무결성을 증명했습니다.
 
 * **Target Device** : Intel Cyclone V FPGA (5CGXFC7C7F23C8)
@@ -9,28 +10,35 @@ Python 기반의 Golden Model과 SystemVerilog RTL 설계를 교차 검증실시
 * **Tools** : Quartus Prime , ModelSim, Python
 
 ## Key Architecture
-1. **Output Stationary Systolic Array** : 데이터 이동으로 인한 전력 소모를 최소화하기 위해서 8x8 배열을 선택했습니다. ( 추후, 배열 확장 예정 )
+1. **Output Stationary Systolic Array** : 각 PE 내부에 32bit 누산기를 고정 배치하여 중간 부분합의 데이터 이동을 없애고, 이로 인한 내부 병목 현상 제거와 동적 전력 소모를 최소화했습니다. ( 추후, 배열 확장 예정 )
 
     ※ 각 PE 내부에는 32-bit 누산기를 배치하여 내부 병목 현상을 제거했습니다.
-2. **FSM Controller** : 파이프라인 데이터 주입을 위한 Pre-skewing 및 연산 타이밍 제어 신호를 생성하는 3-state(IDLE->RUN->DONE)를 설계했습니다.
-3. **Datapath** : 오버플로우를 방지하는 포화 연산 및 산술 우측 시프트 기반의 스케일링(Truncation) 로직을 하드웨어에 구현하였습니다.
-
-## PPA Results
-* **Fmax** : 117.88 MHz
-* **Computing Power** : 15.08 GOPS
-* **Logic Utilization** : 2,739 ALMs
-* **DSP Blocks** : 64/156(41%)
-* **Timing Slack** : 1.517 ns
-* **Total Virtual Pins** 1,536개
+2. **FSM Controller** : 연산 타이밍 제어 신호를 생성하는 3-state(IDLE->RUN->DONE)를 설계했습니다. 또한, capture_pulse를 추가하여 512bit 최종 결과를 버퍼에 한 번에 래치할 수 있도록 했습니다.
+3. **PE(Datapath)** : 오버플로우를 방지하는 포화 연산 및 산술 우측 시프트 기반의 스케일링(Truncation) 로직을 하드웨어에 구현하였습니다.
+4. **Skewing_file** : 64bit 병렬 입력 데이터를 8bit 단위로 슬라이싱하고, 클럭마다 대각선 형태로 밀어 넣는 계단식 지연 파이프라인을 구현했습니다.
+5. **output_reg** : 메모리 매핑 기능을 수행하며 주소값에 따라 내부 버퍼에 64비트 데이터만 선택하여 rdata포트로 출력하게 했습니다.
+6. **M10K_buffer** : FPGA 내부의 M10K 블록 ram으로 매핑되는 64bit 데이터 버퍼 모듈을 통합했습니다.
 
 ## Verification
-* **Python Golden Model** : Numpy를 활용하여 데이터 자료형 및 하드웨어 연산 특성을 모사하여 정답지 모델을 설계했습니다.
-* **Testbench** : SystemVerilog의 '$readmemh'를 활용하여 64개의 매트릭스 출력을 매 클럭 자동으로 비교하고 에러를 검출하는 환경을 설계했습니다.
-* **Corner Case Test** : 최대 양수 및 최소 음수 데이터의 연속 누산 상황에서도 오버플로우 없이 100% 일치하는 연산 결과를 확보했습니다.
+* **Python Golden Model** : 하드웨어의 슬라이싱 구조 및 데이터 주입 방식을 맞추기 위해, 미리 행렬을 전치하여 완벽하게 일치하는 Reference 정답을 추출했습니다.
+* **Testbench** : SystemVerilog의 '$readmemh'를 활용하여 매 클럭 자동으로 비교하고 에러를 검출하는 환경을 설계했습니다. 추가적으로, repeat를 사용하지 않고 capture_pulse를 트리거로 삼아서 검증을 시도하였습니다. 
+
+## PPA Results
+* **Fmax** : 113.6 MHz
+* **Computing Power** : 14.54 GOPS
+* **Logic Utilization** : 1,806 ALMs
+* **DSP Blocks** : 64/156(41%)
+* **Timing Slack** : 1.197 ns
+* **Total pins** : 207/268(77%)
+* **Total block memory bits** 1,424
+
+## Architecture 개선 과정
+* **기존 문제점** : 초기 순수 MAC 코어 설계 시, 1,536bit에 달하는 2차원 배열 데이터를 외부 포트로 직접 입력받았습니다. 이를 Virtual Pin을 통해서 합성을 진행했지만 실제 칩에서는 핀 개수 부족과 극심한 I/O 라우팅 병목으로 인해 물리적으로 구현이 어려운 모델이었습니다.
+*  **해결책**
+1. 내부 데이터 보관용 M10K buffer 설계
+2. skewing_file을 추가하여 systolic array 배열에 데이터를 순차 공급
+3. 64bit 단위로 데이터를 쓰고 읽을 수 있도록 interface 설계
+* **결과** : I/O 포트 사이즈를 1,536bit에서 64bit로 축소하여 혼잡도를 해결하였습니다.
 
 ## 향후 계획
-**FPGA 내부의 M10K 메모리 블록을 인스턴스화하여, 외부에서 들어오는 데이터를 미리 저장할 buffer 설계 예정.**
-
-**문제점** : 현재 순수 MAC 코어 단독 설계 상태이며, 1,536비트의 대규모 데이터 입출력으로 인한 I/O병목 현상과 물리적 핀 개수 한계가 존재합니다. (현재는 Virtual Pin 제약을 통해 Fitter 에러를 우회하여 PPA를 추출한 상태입니다.)
-
-**개선 방안** : 코어 내부에 데이터를 미리 저장할 수 있는 SRAM Buffer를 설계하여 I/O 병목을 해결하려고 합니다.
+**표준 시스템 버스 프로토콜 통합 예정**
