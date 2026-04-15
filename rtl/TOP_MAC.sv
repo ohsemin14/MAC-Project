@@ -12,13 +12,16 @@ module TOP_MAC #(
 
   output logic valid_out,
   // 현재는 8x8로 64개가 나와야함.
-  output logic signed [7:0] result_out [0:Array_size-1][0:Array_size-1]
+  output logic signed [Array_size*Array_size*8-1:0] result_out
+  //output logic signed [7:0] result_out [0:Array_size-1][0:Array_size-1]
 );
 
 // 내부 배선 연결
 // PE 사이를 연결하거나, 외부에서 들어온 신호를 PE에 전달할 선 데이터용 Wire
 logic signed [7:0] a_wire [0:Array_size-1][0:Array_size-1];
 logic signed [7:0] w_wire [0:Array_size-1][0:Array_size-1];
+
+logic signed [7:0] internal_result [0:Array_size-1][0:Array_size-1];
 
 // 제어 신호용 Wire
 logic valid_wire_right [0:Array_size-1][0:Array_size-1];
@@ -55,15 +58,22 @@ generate
         assign current_valid_in = valid_wire_right[i][j-1];
         assign current_clear_in = clear_wire_right[i][j-1];
       end
-      
 
       PE pe_list(
         .clk(clk), .reset_n(reset_n), .a_in(current_a_in), .w_in(current_w_in),
-        .valid_in(current_valid_in), .acc_clear(current_clear_in), .result_out(result_out[i][j]),
+        .valid_in(current_valid_in), .acc_clear(current_clear_in), .result_out(internal_result[i][j]),
         .valid_out(), .a_out(a_wire[i][j]), .w_out(w_wire[i][j]),
         .valid_out_right(valid_wire_right[i][j]), .acc_clear_out_right(clear_wire_right[i][j])
       );
-    end
-  end
+end
+end
 endgenerate
+  always_comb begin
+    for(int i=0; i<Array_size; i++) begin
+      for(int j=0; j<Array_size; j++) begin
+        result_out[(i*Array_size +j)*8 +:8] = internal_result[i][j];
+        end
+      end
+    end
+
 endmodule
