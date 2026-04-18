@@ -23,6 +23,10 @@ Python 기반의 Golden Model과 SystemVerilog RTL 설계를 교차 검증실시
 * **Python Golden Model** : 하드웨어의 슬라이싱 구조 및 데이터 주입 방식을 맞추기 위해, 미리 행렬을 전치하여 완벽하게 일치하는 Reference 정답을 추출했습니다.
 * **Testbench** : SystemVerilog의 '$readmemh'를 활용하여 매 클럭 자동으로 비교하고 에러를 검출하는 환경을 설계했습니다. 추가적으로, repeat를 사용하지 않고 capture_pulse를 트리거로 삼아서 검증을 시도하였습니다. 
 
+## Simple Architecture Block Diagram
+![Total_TOP_v2](./img/v2/Total_TOP_v2.drawio.png)
+![PE](./img/v2/PE.drawio.png)
+
 ## PPA Results
 * **Fmax** : 113.6 MHz
 * **Computing Power** : 14.54 GOPS
